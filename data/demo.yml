@@ -1,0 +1,90 @@
+tokens:
+  - symbol: BTC
+    price: 66247.85
+    volume: 25841932855
+    price_change_24h: 1.23
+    mark_price: 66250.12
+    funding_rate: 0.0001
+  - symbol: ETH
+    price: 3430.56
+    volume: 12547896321
+    price_change_24h: -0.45
+    mark_price: 3429.98
+    funding_rate: 0.0002
+  - symbol: SOL
+    price: 175.32
+    volume: 3659874125
+    price_change_24h: 2.76
+    mark_price: 175.45
+    funding_rate: 0.0003
+  - symbol: BNB
+    price: 574.89
+    volume: 1954781236
+    price_change_24h: 0.89
+    mark_price: 575.01
+    funding_rate: 0.0001
+  - symbol: XRP
+    price: 0.5487
+    volume: 1247895632
+    price_change_24h: -1.32
+    mark_price: 0.5485
+    funding_rate: 0.0001
+  - symbol: ADA
+    price: 0.4589
+    volume: 987541236
+    price_change_24h: 0.78
+    mark_price: 0.4592
+    funding_rate: 0.0002
+  - symbol: DOGE
+    price: 0.1245
+    volume: 745896321
+    price_change_24h: 3.45
+    mark_price: 0.1247
+    funding_rate: 0.0004
+  - symbol: LINK
+    price: 17.89
+    volume: 658741236
+    price_change_24h: 1.87
+    mark_price: 17.91
+    funding_rate: 0.0001
+  - symbol: DOT
+    price: 7.56
+    volume: 528741963
+    price_change_24h: -0.54
+    mark_price: 7.55
+    funding_rate: 0.0002
+  - symbol: AVAX
+    price: 38.74
+    volume: 487512369
+    price_change_24h: 2.14
+    mark_price: 38.78
+    funding_rate: 0.0003
+  - symbol: MATIC
+    price: 0.8745
+    volume: 384521697
+    price_change_24h: 1.23
+    mark_price: 0.8748
+    funding_rate: 0.0001
+  - symbol: UNI
+    price: 9.87
+    volume: 274851369
+    price_change_24h: -1.48
+    mark_price: 9.85
+    funding_rate: 0.0002
+
+liquidations:
+  - type: long
+    amount: 2547896
+    symbol: BTC
+  - type: short
+    amount: 1569874
+    symbol: ETH
+  - type: long
+    amount: 958741
+    symbol: SOL
+  - type: short
+    amount: 754896
+    symbol: BNB
+  - type: long
+    amount: 487512
+    symbol: XRP 

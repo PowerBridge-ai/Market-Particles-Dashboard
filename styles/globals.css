@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 0, 0, 0;
+  --background-end-rgb: 0, 0, 0;
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+.debug-panel {
+  @apply bg-black/30 backdrop-blur-md rounded-lg p-4 text-white text-sm;
+}
+
+.debug-panel h3 {
+  @apply text-base font-medium mb-2;
+}
+
+.debug-section {
+  @apply mb-4;
+}
+
+.debug-property {
+  @apply flex justify-between mb-1;
+}
+
+.debug-property-label {
+  @apply text-gray-300;
+}
+
+.debug-property-value {
+  @apply font-mono text-gray-100;
+}
+
+/* Range input styling */
+input[type=range] {
+  @apply h-2 rounded-lg appearance-none cursor-pointer bg-gray-700;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  @apply appearance-none w-4 h-4 rounded-full bg-blue-500 cursor-pointer;
+}
+
+/* Select styling */
+select {
+  @apply bg-gray-700 border border-gray-600 text-white rounded-lg p-2 text-sm;
+}
+
+/* Button styling */
+button {
+  @apply px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors;
+}
+
+/* Tabs styling */
+.tab-button {
+  @apply px-4 py-2 text-sm rounded-t-lg;
+}
+
+.tab-button.active {
+  @apply bg-gray-800 text-white;
+}
+
+.tab-button:not(.active) {
+  @apply bg-gray-900 text-gray-400 hover:text-white;
+}
+
+/* Card styling */
+.card {
+  @apply bg-gray-800 rounded-lg p-4 shadow-lg;
+} 

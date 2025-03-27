@@ -1,0 +1,53 @@
+{
+  "name": "market-particles-dashboard",
+  "version": "1.0.0",
+  "description": "Interactive market data visualization dashboard with multiple particle animations",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "keywords": [
+    "visualization",
+    "particles",
+    "market-data",
+    "3d",
+    "three.js",
+    "force-graph",
+    "dashboard"
+  ],
+  "author": "AUTO-BOT",
+  "license": "MIT",
+  "dependencies": {
+    "3d-force-graph": "^1.77.0",
+    "d3": "^7.9.0",
+    "next": "^14.0.4",
+    "papaparse": "^5.4.1",
+    "pg": "^8.11.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-feather": "^2.0.10",
+    "react-hook-form": "^7.49.2",
+    "recharts": "^2.10.3",
+    "swr": "^2.2.4",
+    "three": "^0.161.0",
+    "three-spritetext": "^1.9.5",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/node": "^20.10.5",
+    "@types/papaparse": "^5.3.14",
+    "@types/pg": "^8.10.9",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "@types/three": "^0.161.2",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.56.0",
+    "eslint-config-next": "^14.0.4",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.3"
+  }
+} 
