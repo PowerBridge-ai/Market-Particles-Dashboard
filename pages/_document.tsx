@@ -4,7 +4,7 @@ import { Html, Head, Main, NextScript } from 'next/document';
 // Import the mkdirs script to ensure directories are created during build
 import '../components/mkdirs';
 
-export default function Document() {
+export default function MyDocument() {
   return (
     <Html lang="en">
       <Head>

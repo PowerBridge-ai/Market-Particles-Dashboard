@@ -12,11 +12,11 @@ const GamdaDebugOverlay = dynamic(() => import('./GamdaDebugOverlay').then(mod =
 
 type VisualizationType = 'basic' | 'galaxy' | 'force-graph';
 
-const Dashboard: React.FC = () => {
-  const [visualizationType, setVisualizationType] = useState<VisualizationType>('force-graph');
+const Dashboard = () => {
+  const [visualizationType, setVisualizationType] = useState('force-graph' as VisualizationType);
   const [marketData, setMarketData] = useState(generateMockData());
   const [liquidationData, setLiquidationData] = useState(generateMockLiquidationEvent());
-  const [config, setConfig] = useState<GamdaConfig>(defaultConfig);
+  const [config, setConfig] = useState(defaultConfig);
   const [showSettings, setShowSettings] = useState(false);
   const [debugInfo, setDebugInfo] = useState({
     dbStatus: {

@@ -1,6 +1,7 @@
 import Papa from 'papaparse';
 import yaml from 'yaml';
-import { Pool } from 'pg';
+// Only import pg in a server environment
+import type { Pool } from 'pg';
 
 export interface MarketToken {
   symbol: string;
@@ -222,11 +223,25 @@ export const queryFromPostgres = async (
   tokensQuery: string,
   liquidationsQuery?: string
 ): Promise<MarketData> => {
-  const pool = new Pool({
-    connectionString,
-  });
+  // Only import 'pg' on the server side
+  let pool;
+  
+  if (typeof window === 'undefined') {
+    // We're on the server
+    const { Pool } = require('pg');
+    pool = new Pool({ connectionString });
+  } else {
+    // We're in the browser, return mock data
+    console.warn('PostgreSQL queries are not supported in the browser. Returning mock data.');
+    return generateMockData();
+  }
   
   try {
+    // Only run if we're on the server
+    if (!pool) {
+      throw new Error('PostgreSQL is not available in this environment');
+    }
+    
     // Query tokens
     const tokensResult = await pool.query(tokensQuery);
     
@@ -256,6 +271,8 @@ export const queryFromPostgres = async (
   } catch (error) {
     throw new Error(`Failed to query from PostgreSQL: ${error}`);
   } finally {
-    await pool.end();
+    if (pool && typeof pool.end === 'function') {
+      await pool.end();
+    }
   }
 }; 
