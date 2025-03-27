@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { parseCSV, parseJSON, parseYAML } from '@/utils/dataUtils';
+import { parseCSV, parseJSON, parseYAML } from '../../utils/dataUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Only allow POST requests

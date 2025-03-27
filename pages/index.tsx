@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 
 // Dynamically import Dashboard component to avoid SSR issues
-const Dashboard = dynamic(() => import('@/components/Dashboard'), { ssr: false });
+const Dashboard = dynamic(() => import('../components/Dashboard'), { ssr: false });
 
 export default function Home() {
   return (

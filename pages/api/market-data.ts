@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import path from 'path';
 import fs from 'fs';
-import { generateMockData, generateMockLiquidationEvent, parseJSON } from '@/utils/dataUtils';
+import { generateMockData, generateMockLiquidationEvent, parseJSON } from '../../utils/dataUtils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {

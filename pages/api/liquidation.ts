@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { generateMockLiquidationEvent } from '@/utils/dataUtils';
+import { generateMockLiquidationEvent } from '../../utils/dataUtils';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   try {

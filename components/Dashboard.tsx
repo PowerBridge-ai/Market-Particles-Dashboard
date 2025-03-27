@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { generateMockData, generateMockLiquidationEvent } from '@/utils/dataUtils';
+import { generateMockData, generateMockLiquidationEvent } from '../utils/dataUtils';
 import DataSourceSelector from './DataSourceSelector';
-import { GamdaConfig, defaultConfig } from '@/config/gamda.config';
+import { GamdaConfig, defaultConfig } from '../config/gamda.config';
 
 // Dynamically import visualization components to avoid SSR issues
 const MarketParticles = dynamic(() => import('./MarketParticles'), { ssr: false });
