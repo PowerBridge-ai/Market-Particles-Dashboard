@@ -55,6 +55,15 @@ export const GamdaDebugOverlay: React.FC<GamdaDebugOverlayProps> = ({
   const [showDbStatus, setShowDbStatus] = useState(false);
   const [activeTab, setActiveTab] = useState<'general' | 'visualization' | 'filters'>('general');
   const [logs, setLogs] = useState<LogMessage[]>([]);
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
+    performance: true,
+    visualization: false,
+    colors: false,
+    display: false,
+    graph: false,
+    forces: false,
+    filters: false
+  });
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   const addLog = (message: string, type: 'info' | 'error' | 'warning' = 'info') => {
@@ -63,6 +72,13 @@ export const GamdaDebugOverlay: React.FC<GamdaDebugOverlayProps> = ({
       message,
       type
     }]);
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
   };
 
   // Log important state changes
@@ -98,23 +114,6 @@ export const GamdaDebugOverlay: React.FC<GamdaDebugOverlayProps> = ({
   };
 
   if (minimal) {
-    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-      performance: true,
-      visualization: false,
-      colors: false,
-      display: false,
-      graph: false,
-      forces: false,
-      filters: false
-    });
-
-    const toggleSection = (section: string) => {
-      setExpandedSections(prev => ({
-        ...prev,
-        [section]: !prev[section]
-      }));
-    };
-
     const SectionHeader = ({ title, section }: { title: string; section: string }) => (
       <button
         onClick={() => toggleSection(section)}
