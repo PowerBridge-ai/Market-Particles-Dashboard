@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { GamdaDebugOverlay } from './GamdaDebugOverlay';
 import { GamdaConfig, defaultConfig } from '../config/gamda.config';
@@ -189,10 +190,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
-  const frameRef = useRef<number | null>(null);
+  const frameRef = useRef<number>();
   const lastFrameTime = useRef(performance.now());
   const frameCount = useRef(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout | null>(null);
+  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
 
@@ -297,7 +298,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         
         // Determine node color based on visualization mode and color scheme
         let color = '#ffffff';
-        switch (config.visualization.colorScheme) {
+        switch (config.visualization.mode) {
           case 'heat':
             color = d3.interpolateReds(normalizedMetric);
             break;
@@ -328,7 +329,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
             if (!targetToken) return;
 
             let correlation = 0;
-            switch (config.visualization.correlationType) {
+            switch (config.visualization.correlation.type) {
               case 'price':
                 correlation = Math.abs(
                   sourceToken.price_change_24h - targetToken.price_change_24h
@@ -351,7 +352,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
                 break;
             }
 
-            if (correlation < config.visualization.correlationThreshold) {
+            if (correlation < config.visualization.correlation.threshold) {
               links.push({
                 source: sourceNode.id,
                 target: targetNode.id,
@@ -367,7 +368,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         nodeCount: nodes.length,
         linkCount: links.length,
         mode: config.visualization.mode,
-        correlationType: config.visualization.correlationType
+        correlationType: config.visualization.correlation.type
       });
 
     } catch (error) {
