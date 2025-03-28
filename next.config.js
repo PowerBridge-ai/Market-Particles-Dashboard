@@ -1,10 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  webpack: (config) => {
-    // Handle 3D visualization dependencies
-    config.externals = [...(config.externals || []), { canvas: 'canvas' }];
-    
+  output: 'standalone',
+  webpack: (config, { isServer }) => {
+    // Handle canvas package
+    if (!isServer) {
+      config.externals = {
+        canvas: 'canvas',
+      }
+    }
+
     // Handle WebGL context
     config.resolve.fallback = {
       ...config.resolve.fallback,
@@ -12,12 +17,20 @@ const nextConfig = {
       net: false,
       tls: false,
       canvas: false,
-    };
+    }
 
-    return config;
+    return config
   },
   // Add transpilePackages to handle 3d-force-graph and related packages
-  transpilePackages: ['three', '3d-force-graph', 'force-graph', 'three-spritetext'],
+  transpilePackages: [
+    'three',
+    '3d-force-graph',
+    'force-graph',
+    'three-spritetext'
+  ],
+  experimental: {
+    esmExternals: 'loose'
+  }
 }
 
 module.exports = nextConfig 
