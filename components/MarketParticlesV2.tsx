@@ -75,16 +75,16 @@ const MarketParticlesV2: React.FC<MarketParticlesProps> = ({
     activeTokens: 0
   });
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene>();
-  const cameraRef = useRef<THREE.PerspectiveCamera>();
-  const rendererRef = useRef<THREE.WebGLRenderer>();
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const starsRef = useRef<Star[]>([]);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | null>(null);
   const galaxyRotationRef = useRef(0);
-  const positionsRef = useRef<Float32Array>();
+  const positionsRef = useRef<Float32Array | null>(null);
   const lastFrameTime = useRef(performance.now());
   const frameCount = useRef(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
+  const fpsUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
   const rawMarketData = autoFetch ? fetchedMarketData : propMarketData;
   const marketData = rawMarketData ? processMarketData(rawMarketData) : null;
