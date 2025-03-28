@@ -144,49 +144,37 @@ interface ForceGraphConstructor {
   };
 }
 
+// Define group colors similar to Obsidian
+const GROUP_COLORS = [
+  '#4CAF50',  // Green
+  '#f44336',  // Red
+  '#2196F3',  // Blue
+  '#E91E63',  // Pink
+];
+
 export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   marketData: propMarketData,
   liquidationData,
   autoFetch = false,
   config: propConfig
 }) => {
+  // States
   const [isClient, setIsClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Set isClient to true on mount
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // If we're not on the client yet, show a loading state
-  if (!isClient) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black">
-        <div className="text-white text-xl">Loading visualization...</div>
-      </div>
-    );
-  }
-
-  // If there's an error, show it
-  if (error) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black">
-        <div className="text-white text-xl">Error: {error}</div>
-      </div>
-    );
-  }
 
   // Load saved configs first to find View 1
   const loadSavedConfigs = () => {
     try {
-      const savedConfigsStr = localStorage.getItem('gamdaConfigs');
-      if (savedConfigsStr) {
-        const configs = JSON.parse(savedConfigsStr);
-        const view1Config = configs.find((c: SavedConfig) => c.name === 'View 1');
-        return {
-          configs,
-          defaultConfig: view1Config?.config || propConfig || defaultConfig
-        };
+      if (typeof window !== 'undefined') {
+        const savedConfigsStr = localStorage.getItem('gamdaConfigs');
+        if (savedConfigsStr) {
+          const configs = JSON.parse(savedConfigsStr);
+          const view1Config = configs.find((c: SavedConfig) => c.name === 'View 1');
+          return {
+            configs,
+            defaultConfig: view1Config?.config || propConfig || defaultConfig
+          };
+        }
       }
     } catch (error) {
       console.error('Error loading saved configurations:', error);
@@ -229,34 +217,31 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   const fpsUpdateInterval = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
+  
+  // ===== HELPER FUNCTIONS =====
+  // These must be defined before they're used in the useEffect hooks!
+  
+  // Generate test data if no market data is available
+  const generateTestData = (): MarketData => {
+    console.log('Generating test data');
+    const symbols = ['BTC', 'ETH', 'SOL', 'AVAX', 'MATIC', 'DOT', 'ADA', 'LINK', 'UNI', 'AAVE', 'SNX', 'DOGE', 'XRP', 'BNB', 'ATOM'];
+    const tokens = symbols.map(symbol => ({
+      symbol,
+      price: Math.random() * 100000,
+      volume: Math.random() * 1000000000,
+      price_change_24h: (Math.random() - 0.5) * 20,
+      mark_price: Math.random() * 100000,
+      funding_rate: (Math.random() - 0.5) * 0.002
+    }));
 
-  // FPS calculation
-  useEffect(() => {
-    const updateFPS = () => {
-      const now = performance.now();
-      const elapsed = now - lastFrameTime.current;
-      const fps = frameCount.current / (elapsed / 1000);
-      setDebugInfo(prev => ({ ...prev, fps }));
-      frameCount.current = 0;
-      lastFrameTime.current = now;
+    const testData = {
+      tokens,
+      liquidations: []
     };
-
-    fpsUpdateInterval.current = setInterval(updateFPS, 1000);
-    return () => {
-      if (fpsUpdateInterval.current) {
-        clearInterval(fpsUpdateInterval.current);
-      }
-    };
-  }, []);
-
-  // Define group colors similar to Obsidian
-  const GROUP_COLORS = [
-    '#4CAF50',  // Green
-    '#f44336',  // Red
-    '#2196F3',  // Blue
-    '#E91E63',  // Pink
-  ];
-
+    console.log('Generated test data:', testData);
+    return testData;
+  };
+  
   // Create graph data from market data
   const createGraphData = (data: MarketData): GraphData => {
     console.log('Creating graph data from market data');
@@ -411,27 +396,109 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
     return { nodes, links };
   };
+  
+  // Add debounced config update
+  const updateGraphWithConfig = (newConfig: GamdaConfig) => {
+    setIsUpdating(true);
+    setConfig(newConfig);
+    
+    // Update graph with new config
+    if (graphRef.current && marketData) {
+      const graphData = createGraphData(marketData);
+      
+      // Smoothly transition node properties
+      const currentData = graphRef.current.graphData({});
+      const oldNodesMap = new Map(currentData.nodes.map((n: NodeObject) => [n.id, n]));
+      
+      graphData.nodes.forEach(node => {
+        const oldNode = oldNodesMap.get(node.id);
+        if (oldNode) {
+          const nodeObject = node as NodeObject;
+          // Type assertion to avoid TypeScript errors
+          nodeObject.x = (oldNode as NodeObject).x || 0;
+          nodeObject.y = (oldNode as NodeObject).y || 0;
+          nodeObject.z = (oldNode as NodeObject).z || 0;
+        }
+      });
 
-  // Generate test data if no market data is available
-  const generateTestData = (): MarketData => {
-    console.log('Generating test data');
-    const symbols = ['BTC', 'ETH', 'SOL', 'AVAX', 'MATIC', 'DOT', 'ADA', 'LINK', 'UNI', 'AAVE', 'SNX', 'DOGE', 'XRP', 'BNB', 'ATOM'];
-    const tokens = symbols.map(symbol => ({
-      symbol,
-      price: Math.random() * 100000,
-      volume: Math.random() * 1000000000,
-      price_change_24h: (Math.random() - 0.5) * 20,
-      mark_price: Math.random() * 100000,
-      funding_rate: (Math.random() - 0.5) * 0.002
-    }));
+      // Update graph with smooth transitions
+      graphRef.current
+        .nodeColor((node: NodeObject) => node.color || '#ffffff')
+        .nodeVal((node: NodeObject) => node.val || 5)
+        .linkWidth((link: LinkObject) => link.value * newConfig.display.linkThicknessScale)
+        .linkColor((link: LinkObject) => link.color || `rgba(255,255,255,${newConfig.graph.linkOpacity})`)
+        .d3Force('charge', d3.forceManyBody().strength(newConfig.forces.repelForce))
+        .d3Force('collision', d3.forceCollide().radius((node: any) => {
+          const n = node as NodeObject;
+          return (n.val || 5) * 1.2;
+        }))
+        .graphData(graphData);
 
-    const testData = {
-      tokens,
-      liquidations: []
-    };
-    console.log('Generated test data:', testData);
-    return testData;
+      // Provide visual feedback
+      setTimeout(() => setIsUpdating(false), 1000);
+    }
   };
+  
+  // Add camera position update handler
+  const handleCameraPositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
+    const newPosition = { ...cameraPosition, [axis]: value };
+    setCameraPosition(newPosition);
+    if (graphRef.current) {
+      graphRef.current.cameraPosition(newPosition);
+      setConfig(prev => ({
+        ...prev,
+        camera: {
+          ...prev.camera,
+          position: newPosition
+        }
+      }));
+    }
+  };
+
+  // Add zoom update handler
+  const handleZoomChange = (value: number) => {
+    setCameraZoom(value);
+    if (graphRef.current) {
+      const newPosition = {
+        ...cameraPosition,
+        z: 150 / value // Adjust base distance based on zoom
+      };
+      graphRef.current.cameraPosition(newPosition);
+      setConfig(prev => ({
+        ...prev,
+        camera: {
+          ...prev.camera,
+          position: newPosition,
+          zoom: value
+        }
+      }));
+    }
+  };
+
+  // ===== EFFECTS =====
+  // Set isClient to true on mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // FPS calculation
+  useEffect(() => {
+    const updateFPS = () => {
+      const now = performance.now();
+      const elapsed = now - lastFrameTime.current;
+      const fps = frameCount.current / (elapsed / 1000);
+      setDebugInfo(prev => ({ ...prev, fps }));
+      frameCount.current = 0;
+      lastFrameTime.current = now;
+    };
+
+    fpsUpdateInterval.current = setInterval(updateFPS, 1000);
+    return () => {
+      if (fpsUpdateInterval.current) {
+        clearInterval(fpsUpdateInterval.current);
+      }
+    };
+  }, []);
 
   // Fetch market data if autoFetch is enabled
   useEffect(() => {
@@ -564,12 +631,14 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
       const testData = generateTestData();
       setFetchedMarketData(testData);
     }
-  }, [autoFetch, propMarketData]);
+  }, [autoFetch, propMarketData, config.performance.useTestData]);
 
   // Initialize and update graph
   useEffect(() => {
     console.log('Graph initialization effect triggered');
 
+    if (!isClient) return;
+    
     if (!containerRef.current || !marketData?.tokens) {
       console.log('Missing required data');
       return;
@@ -676,10 +745,12 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         console.error('Error updating graph data:', error);
       }
     }
-  }, [marketData, config]);
+  }, [marketData, config, isClient]);
 
   // Handle liquidation updates
   useEffect(() => {
+    if (!isClient) return;
+    
     if (liquidationData && graphRef.current) {
       const { symbol, side } = liquidationData;
       const currentData = graphRef.current.graphData({});
@@ -698,10 +769,12 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         }, 1000);
       }
     }
-  }, [liquidationData]);
+  }, [liquidationData, isClient]);
 
   // Fetch database status
   useEffect(() => {
+    if (!isClient) return;
+    
     const fetchDbStatus = async () => {
       try {
         console.log('Fetching database status...');
@@ -735,10 +808,12 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
     const interval = setInterval(fetchDbStatus, 5000);
     fetchDbStatus();
     return () => clearInterval(interval);
-  }, []);
+  }, [isClient]);
 
   // Update frame count for FPS calculation
   useEffect(() => {
+    if (!isClient) return;
+    
     const animate = () => {
       frameCount.current++;
       frameRef.current = requestAnimationFrame(animate);
@@ -750,60 +825,40 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, []);
+  }, [isClient]);
 
-  // Add debounced config update
-  const updateGraphWithConfig = (newConfig: GamdaConfig) => {
-    setIsUpdating(true);
-    setConfig(newConfig);
+  // Add camera position sync on graph initialization
+  useEffect(() => {
+    if (!isClient) return;
     
-    // Update graph with new config
-    if (graphRef.current && marketData) {
-      const graphData = createGraphData(marketData);
-      
-      // Smoothly transition node properties
-      const currentData = graphRef.current.graphData({});
-      const oldNodesMap = new Map(currentData.nodes.map((n: NodeObject) => [n.id, n]));
-      
-      graphData.nodes.forEach(node => {
-        const oldNode = oldNodesMap.get(node.id);
-        if (oldNode) {
-          const nodeObject = node as NodeObject;
-          // Type assertion to avoid TypeScript errors
-          // @ts-ignore - oldNode has x, y, z properties when coming from ForceGraph
-          nodeObject.x = oldNode.x || 0;
-          // @ts-ignore
-          nodeObject.y = oldNode.y || 0;
-          // @ts-ignore
-          nodeObject.z = oldNode.z || 0;
-        }
-      });
-
-      // Update graph with smooth transitions
-      graphRef.current
-        .nodeColor((node: NodeObject) => node.color || '#ffffff')
-        .nodeVal((node: NodeObject) => node.val || 5)
-        .linkWidth((link: LinkObject) => link.value * newConfig.display.linkThicknessScale)
-        .linkColor((link: LinkObject) => link.color || `rgba(255,255,255,${newConfig.graph.linkOpacity})`)
-        .d3Force('charge', d3.forceManyBody().strength(newConfig.forces.repelForce))
-        .d3Force('collision', d3.forceCollide().radius((node: any) => {
-          const n = node as NodeObject;
-          return (n.val || 5) * 1.2;
-        }))
-        .graphData(graphData);
-
-      // Provide visual feedback
-      setTimeout(() => setIsUpdating(false), 1000);
+    if (graphRef.current) {
+      graphRef.current.cameraPosition(config.camera.position);
     }
-  };
+  }, [config.camera.position, isClient]);
 
-  // Update the config change handler in GamdaDebugOverlay props
-  const handleConfigChange = (newConfig: GamdaConfig) => {
-    updateGraphWithConfig(newConfig);
-  };
+  // Add mouse wheel zoom handler
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const handleWheel = (event: WheelEvent) => {
+      if (graphRef.current && event.deltaY !== 0) {
+        const delta = -Math.sign(event.deltaY) * 0.1;
+        const newZoom = Math.max(0.1, Math.min(5, cameraZoom + delta));
+        handleZoomChange(newZoom);
+      }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel);
+      return () => container.removeEventListener('wheel', handleWheel);
+    }
+  }, [cameraZoom, isClient]);
 
   // Load saved configurations from localStorage on mount
   useEffect(() => {
+    if (!isClient) return;
+    
     const savedConfigsStr = localStorage.getItem('gamdaConfigs');
     if (savedConfigsStr) {
       try {
@@ -813,7 +868,30 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         console.error('Error loading saved configurations:', error);
       }
     }
-  }, []);
+  }, [isClient]);
+
+  // ===== EARLY RETURNS =====
+  if (!isClient) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Loading visualization...</div>
+      </div>
+    );
+  }
+
+  // If there's an error, show it
+  if (error) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Error: {error}</div>
+      </div>
+    );
+  }
+
+  // Update the config change handler in GamdaDebugOverlay props
+  const handleConfigChange = (newConfig: GamdaConfig) => {
+    updateGraphWithConfig(newConfig);
+  };
 
   // Save configuration
   const handleSaveConfig = () => {
@@ -851,66 +929,6 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
     setSavedConfigs(updatedConfigs);
     localStorage.setItem('gamdaConfigs', JSON.stringify(updatedConfigs));
   };
-
-  // Add camera position update handler
-  const handleCameraPositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
-    const newPosition = { ...cameraPosition, [axis]: value };
-    setCameraPosition(newPosition);
-    if (graphRef.current) {
-      graphRef.current.cameraPosition(newPosition);
-      setConfig(prev => ({
-        ...prev,
-        camera: {
-          ...prev.camera,
-          position: newPosition
-        }
-      }));
-    }
-  };
-
-  // Add zoom update handler
-  const handleZoomChange = (value: number) => {
-    setCameraZoom(value);
-    if (graphRef.current) {
-      const newPosition = {
-        ...cameraPosition,
-        z: 150 / value // Adjust base distance based on zoom
-      };
-      graphRef.current.cameraPosition(newPosition);
-      setConfig(prev => ({
-        ...prev,
-        camera: {
-          ...prev.camera,
-          position: newPosition,
-          zoom: value
-        }
-      }));
-    }
-  };
-
-  // Add camera position sync on graph initialization
-  useEffect(() => {
-    if (graphRef.current) {
-      graphRef.current.cameraPosition(config.camera.position);
-    }
-  }, [config.camera.position]);
-
-  // Add mouse wheel zoom handler
-  useEffect(() => {
-    const handleWheel = (event: WheelEvent) => {
-      if (graphRef.current && event.deltaY !== 0) {
-        const delta = -Math.sign(event.deltaY) * 0.1;
-        const newZoom = Math.max(0.1, Math.min(5, cameraZoom + delta));
-        handleZoomChange(newZoom);
-      }
-    };
-
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel);
-      return () => container.removeEventListener('wheel', handleWheel);
-    }
-  }, [cameraZoom]);
 
   return (
     <div className="relative w-full h-full">
