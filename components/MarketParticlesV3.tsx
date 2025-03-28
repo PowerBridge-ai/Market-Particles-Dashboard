@@ -408,6 +408,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         try {
           // If using test data, don't make API calls
           if (config.performance.useTestData) {
+            console.log('Using test data');
             const testData = generateTestData();
             setFetchedMarketData(testData);
             setDebugInfo(prev => ({
@@ -438,22 +439,26 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
             return;
           }
 
-          console.log('Fetching market data...');
+          console.log('Fetching market data from API...');
           const [tickersResponse, marketMoversResponse] = await Promise.all([
-            fetch('/api/tickers'),
-            fetch('/api/market-movers')
+            fetch('/api/tickers').then(res => {
+              if (!res.ok) throw new Error(`Tickers API error: ${res.status}`);
+              return res.json();
+            }),
+            fetch('/api/market-movers').then(res => {
+              if (!res.ok) throw new Error(`Market Movers API error: ${res.status}`);
+              return res.json();
+            })
           ]);
 
-          if (!tickersResponse.ok || !marketMoversResponse.ok) {
-            throw new Error('Failed to fetch market data');
-          }
-
-          const tickers = await tickersResponse.json();
-          const marketMovers = await marketMoversResponse.json();
+          console.log('API responses received:', {
+            tickersData: tickersResponse?.length,
+            marketMoversData: marketMoversResponse?.length
+          });
 
           // Process and combine the data
           const processedData: MarketData = {
-            tokens: tickers.map((ticker: any) => ({
+            tokens: tickersResponse.map((ticker: any) => ({
               symbol: ticker.symbol,
               price: parseFloat(ticker.last_price) || 0,
               volume: parseFloat(ticker.volume_24h) || 0,
@@ -467,10 +472,14 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
           };
 
           console.log('Processed market data:', {
-            totalTickers: tickers.length,
+            totalTickers: tickersResponse.length,
             processedTokens: processedData.tokens.length,
             sampleToken: processedData.tokens[0]
           });
+
+          if (processedData.tokens.length === 0) {
+            throw new Error('No valid market data after processing');
+          }
 
           setFetchedMarketData(processedData);
           setDebugInfo(prev => ({
@@ -479,7 +488,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
               isConnected: true,
               tables: {
                 tickers: { 
-                  rowCount: tickers.length, 
+                  rowCount: tickersResponse.length, 
                   lastUpdate: new Date().toISOString() 
                 },
                 liquidations: { 
@@ -487,11 +496,11 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
                   lastUpdate: new Date().toISOString() 
                 },
                 market_movers: { 
-                  rowCount: marketMovers.length, 
+                  rowCount: marketMoversResponse.length, 
                   lastUpdate: new Date().toISOString() 
                 },
                 kline_data: { 
-                  rowCount: 2099000, // From your current data
+                  rowCount: 2099000,
                   lastUpdate: new Date().toISOString() 
                 }
               }
@@ -500,7 +509,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
           }));
         } catch (error) {
           console.error('Failed to fetch market data:', error);
-          // Use test data on error
+          // Use test data on error and show error in UI
           const testData = generateTestData();
           setFetchedMarketData(testData);
           setDebugInfo(prev => ({
@@ -522,11 +531,11 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         }
       };
 
-      const interval = setInterval(fetchData, 2000);
       fetchData();
+      const interval = setInterval(fetchData, 2000);
       return () => clearInterval(interval);
     } else if (!propMarketData) {
-      // Use test data if no prop data is provided
+      console.log('No prop market data provided, using test data');
       const testData = generateTestData();
       setFetchedMarketData(testData);
     }
@@ -893,7 +902,14 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
       <div ref={containerRef} className="absolute inset-0" style={{ background: '#000005' }} />
       {!marketData ? (
         <div className="absolute inset-0 flex items-center justify-center bg-black">
-          <div className="text-white text-xl">Loading market data...</div>
+          <div className="text-white text-xl flex flex-col items-center space-y-4">
+            <div>Loading market data...</div>
+            {debugInfo.dbStatus && !debugInfo.dbStatus.isConnected && (
+              <div className="text-red-400 text-sm">
+                Failed to connect to API. Using test data...
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <>
