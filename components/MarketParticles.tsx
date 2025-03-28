@@ -19,11 +19,11 @@ interface MarketParticlesProps {
 
 const MarketParticles = ({ marketData }: MarketParticlesProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<THREE.Scene>();
-  const cameraRef = useRef<THREE.PerspectiveCamera>();
-  const rendererRef = useRef<THREE.WebGLRenderer>();
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const particlesRef = useRef<Particle[]>([]);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
