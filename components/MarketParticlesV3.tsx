@@ -190,10 +190,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
-  const frameRef = useRef<number>();
-  const lastFrameTime = useRef(performance.now());
-  const frameCount = useRef(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
+  const frameRef = useRef<number | undefined>(undefined);
+  const lastFrameTime = useRef<number>(performance.now());
+  const frameCount = useRef<number>(0);
+  const fpsUpdateInterval = useRef<NodeJS.Timeout | undefined>(undefined);
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
 
@@ -299,10 +299,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         // Determine node color based on visualization mode and color scheme
         let color = '#ffffff';
         switch (config.visualization.mode) {
-          case 'heat':
+          case 'volume':
             color = d3.interpolateReds(normalizedMetric);
             break;
-          case 'gradient':
+          case 'momentum':
             color = d3.interpolateViridis(normalizedMetric);
             break;
           default:
