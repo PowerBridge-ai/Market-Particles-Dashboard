@@ -240,17 +240,23 @@ export const GamdaDebugOverlay: React.FC<GamdaDebugOverlayProps> = ({
                 <div>
                   <label className="block text-xs mb-1">Correlation Type</label>
                   <select
-                    value={config.visualization.correlationType}
+                    value={config.visualization.correlation.type}
                     onChange={(e) => onConfigChange({
                       ...config,
-                      visualization: { ...config.visualization, correlationType: e.target.value as any }
+                      visualization: { 
+                        ...config.visualization, 
+                        correlation: {
+                          ...config.visualization.correlation,
+                          type: e.target.value as any
+                        }
+                      }
                     })}
-                    className="w-full bg-black/30 text-white text-sm rounded px-2 py-1 backdrop-blur-sm"
+                    className="w-full px-2 py-1 bg-gray-700 rounded text-sm"
                   >
-                    <option value="price">Price Movement</option>
-                    <option value="volume">Volume Profile</option>
-                    <option value="volatility">Volatility Pattern</option>
-                    <option value="combined">Combined Metrics</option>
+                    <option value="price">Price Change</option>
+                    <option value="volume">Volume</option>
+                    <option value="volatility">Volatility</option>
+                    <option value="combined">Combined</option>
                   </select>
                 </div>
               </div>
@@ -701,17 +707,23 @@ export const GamdaDebugOverlay: React.FC<GamdaDebugOverlayProps> = ({
                 <div>
                   <label className="block mb-2">Correlation Type</label>
                   <select
-                    value={config.visualization.correlationType}
+                    value={config.visualization.correlation.type}
                     onChange={(e) => onConfigChange({
                       ...config,
-                      visualization: { ...config.visualization, correlationType: e.target.value as any }
+                      visualization: { 
+                        ...config.visualization, 
+                        correlation: {
+                          ...config.visualization.correlation,
+                          type: e.target.value as any
+                        }
+                      }
                     })}
-                    className="w-full bg-gray-700 rounded px-2 py-1"
+                    className="w-full px-2 py-1 bg-gray-700 rounded text-sm"
                   >
-                    <option value="price">Price Movement</option>
-                    <option value="volume">Volume Profile</option>
-                    <option value="volatility">Volatility Pattern</option>
-                    <option value="combined">Combined Metrics</option>
+                    <option value="price">Price Change</option>
+                    <option value="volume">Volume</option>
+                    <option value="volatility">Volatility</option>
+                    <option value="combined">Combined</option>
                   </select>
                 </div>
                 <div>
