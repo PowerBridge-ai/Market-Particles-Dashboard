@@ -189,10 +189,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | null>(null);
   const lastFrameTime = useRef(performance.now());
   const frameCount = useRef(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
+  const fpsUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
 
