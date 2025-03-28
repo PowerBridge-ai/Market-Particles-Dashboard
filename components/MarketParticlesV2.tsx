@@ -1,7 +1,11 @@
+import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { GamdaDebugOverlay } from './GamdaDebugOverlay';
 import { GamdaConfig, defaultConfig } from '../config/gamda.config';
+import type { MarketData as RawMarketData } from '../utils/dataUtils';
+import type { ProcessedMarketData, ProcessedMarketToken } from '../types/market';
+import { processMarketData } from '../types/market';
 
 interface Star {
   symbol: string;
@@ -16,26 +20,12 @@ interface Star {
   initialAngle: number;
 }
 
-interface MarketData {
-  tokens: Array<{
-    symbol: string;
-    price: number;
-    volume: number;
-    price_change_24h: number;
-    mark_price: number;
-    funding_rate: number;
-  }>;
-  liquidations: Array<{
-    type: 'long' | 'short';
-    amount: number;
-    symbol: string;
-  }>;
-}
-
-interface MarketParticlesProps {
-  marketData: MarketData | null;
-  liquidationData?: LiquidationData;
-  autoFetch?: boolean;
+export interface LiquidationData {
+  symbol: string;
+  side: string;
+  quantity: number;
+  price: number;
+  timestamp: string;
 }
 
 interface TableStatus {
@@ -66,20 +56,18 @@ interface DebugInfo {
   };
 }
 
-interface LiquidationData {
-  symbol: string;
-  side: string;
-  quantity: number;
-  price: number;
-  timestamp: string;
+interface MarketParticlesProps {
+  marketData: RawMarketData | null;
+  liquidationData?: LiquidationData;
+  autoFetch?: boolean;
 }
 
-export const MarketParticlesV2: React.FC<MarketParticlesProps> = ({ 
+const MarketParticlesV2: React.FC<MarketParticlesProps> = ({ 
   marketData: propMarketData, 
   liquidationData,
   autoFetch = false 
 }) => {
-  const [fetchedMarketData, setFetchedMarketData] = useState<MarketData | null>(null);
+  const [fetchedMarketData, setFetchedMarketData] = useState<RawMarketData | null>(null);
   const [config, setConfig] = useState<GamdaConfig>(defaultConfig);
   const [debugInfo, setDebugInfo] = useState<DebugInfo>({
     dbStatus: null,
@@ -92,13 +80,27 @@ export const MarketParticlesV2: React.FC<MarketParticlesProps> = ({
   const rendererRef = useRef<THREE.WebGLRenderer>();
   const starsRef = useRef<Star[]>([]);
   const frameRef = useRef<number>();
-  const galaxyRotation = useRef(0);
+  const galaxyRotationRef = useRef(0);
   const positionsRef = useRef<Float32Array>();
   const lastFrameTime = useRef(performance.now());
   const frameCount = useRef(0);
   const fpsUpdateInterval = useRef<NodeJS.Timeout>();
 
-  const marketData = autoFetch ? fetchedMarketData : propMarketData;
+  const rawMarketData = autoFetch ? fetchedMarketData : propMarketData;
+  const marketData = rawMarketData ? processMarketData(rawMarketData) : null;
+
+  // Helper function to handle optional fields
+  const getTokenValue = (token: ProcessedMarketToken) => ({
+    ...token,
+    mark_price: token.mark_price ?? token.price,
+    funding_rate: token.funding_rate ?? 0
+  });
+
+  // Process market data to ensure required fields
+  const processedMarketData = marketData ? {
+    ...marketData,
+    tokens: marketData.tokens.map(getTokenValue)
+  } : null;
 
   // FPS calculation
   useEffect(() => {
@@ -319,7 +321,7 @@ export const MarketParticlesV2: React.FC<MarketParticlesProps> = ({
     starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
     starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-    // Create material for stars
+    // Create star material
     const starMaterial = new THREE.ShaderMaterial({
       uniforms: {
         time: { value: 0 }
@@ -355,163 +357,60 @@ export const MarketParticlesV2: React.FC<MarketParticlesProps> = ({
       depthTest: false
     });
 
-    // Create the star system
-    const starSystem = new THREE.Points(starGeometry, starMaterial);
-    scene.add(starSystem);
+    // Create point cloud
+    const pointCloud = new THREE.Points(starGeometry, starMaterial);
+    scene.add(pointCloud);
 
-    console.log('Star system created with:', {
-      numStars: sortedTokens.length,
-      geometryAttributes: {
-        positions: positions.length,
-        sizes: sizes.length,
-        colors: colors.length
-      }
-    });
-
-    // Add core glow
-    const coreLight = new THREE.PointLight(0x4444ff, 2.0, CORE_RADIUS * 2);
-    coreLight.position.set(0, 0, 0);
-    scene.add(coreLight);
-
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0x202020);
-    scene.add(ambientLight);
-
-    // Animation loop
-    const animate = () => {
-      frameRef.current = requestAnimationFrame(animate);
-      frameCount.current++;
-      
-      galaxyRotation.current += config.galaxy.rotationSpeed;
-
-      // Update star positions
-      starsRef.current.forEach((star, index) => {
-        const i3 = index * 3;
-        const angle = galaxyRotation.current * (1 - star.velocity) + star.initialAngle;
-        
-        positions[i3] = Math.cos(angle) * star.distanceFromCenter;
-        positions[i3 + 2] = Math.sin(angle) * star.distanceFromCenter;
-        positions[i3 + 1] = star.position.y;
-      });
-
-      starGeometry.attributes.position.needsUpdate = true;
-
-      // Subtle camera movement
-      const time = galaxyRotation.current;
-      camera.position.x = Math.sin(time * 0.1) * 30;
-      camera.position.z = Math.cos(time * 0.1) * 30;
-      camera.position.y = config.camera.height + Math.sin(time * 0.05) * 5;
-      camera.lookAt(0, 0, 0);
-
-      coreLight.intensity = 2.0 + Math.sin(time * 2) * 0.2;
-
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    // Handle window resize
-    const handleResize = () => {
-      if (!containerRef.current) return;
-      const width = containerRef.current.clientWidth;
-      const height = containerRef.current.clientHeight;
-
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.setSize(width, height);
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    };
-
-    window.addEventListener('resize', handleResize);
-
-    // Store refs
+    // Set scene and camera
     sceneRef.current = scene;
     cameraRef.current = camera;
     rendererRef.current = renderer;
 
-    // Cleanup
+    // Animation loop
+    const animate = () => {
+      if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return;
+
+      // Update star positions
+      const stars = starsRef.current;
+      const now = performance.now();
+      const elapsed = now - lastFrameTime.current;
+      const frameCount = frameRef.current || 0;
+      const frameTime = elapsed / 1000;
+      const galaxyRotation = galaxyRotationRef.current;
+
+      stars.forEach(star => {
+        const { position, targetPosition, velocity, initialAngle } = star;
+        const angle = initialAngle + galaxyRotation * 0.001;
+        const x = Math.cos(angle) * GALAXY_RADIUS;
+        const z = Math.sin(angle) * GALAXY_RADIUS;
+        const y = (Math.random() - 0.5) * VERTICAL_DISPERSION;
+        star.position.set(x, y, z);
+        star.targetPosition.set(x, y, z);
+      });
+
+      // Update camera position
+      cameraRef.current.position.set(0, config.camera.height, 0);
+      cameraRef.current.lookAt(0, 0, 0);
+
+      // Render scene
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+
+      // Update frame count and time
+      frameRef.current = frameCount + 1;
+      lastFrameTime.current = now;
+
+      // Request next frame
+      requestAnimationFrame(animate);
+    };
+
+    animate();
+
     return () => {
-      console.log('Cleaning up galaxy visualization');
-      window.removeEventListener('resize', handleResize);
-      if (frameRef.current) {
-        cancelAnimationFrame(frameRef.current);
+      if (rendererRef.current) {
+        rendererRef.current.dispose();
       }
-      if (containerRef.current && rendererRef.current) {
-        containerRef.current.removeChild(rendererRef.current.domElement);
-      }
-      scene.clear();
-      renderer.dispose();
     };
   }, [marketData, config]);
-
-  useEffect(() => {
-    const fetchDbStatus = async () => {
-      try {
-        const response = await fetch('/api/gamda/db-status');
-        const data = await response.json();
-        setDebugInfo(prev => ({
-          ...prev,
-          dbStatus: data
-        }));
-      } catch (error) {
-        console.error('Failed to fetch DB status:', error);
-      }
-    };
-
-    const interval = setInterval(fetchDbStatus, 5000);
-    fetchDbStatus();
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    let frameCount = 0;
-    let lastTime = performance.now();
-    
-    const calculateFps = () => {
-      const currentTime = performance.now();
-      const deltaTime = currentTime - lastTime;
-      
-      if (deltaTime >= 1000) {
-        const fps = frameCount * 1000 / deltaTime;
-        setDebugInfo(prev => ({
-          ...prev,
-          fps
-        }));
-        frameCount = 0;
-        lastTime = currentTime;
-      }
-      frameCount++;
-      requestAnimationFrame(calculateFps);
-    };
-
-    const fpsAnimation = requestAnimationFrame(calculateFps);
-    return () => cancelAnimationFrame(fpsAnimation);
-  }, []);
-
-  useEffect(() => {
-    if (marketData) {
-      setDebugInfo(prev => ({
-        ...prev,
-        activeTokens: Object.keys(marketData).length
-      }));
-    }
-  }, [marketData]);
-
-  useEffect(() => {
-    if (liquidationData) {
-      setDebugInfo(prev => ({
-        ...prev,
-        latestLiquidation: {
-          symbol: liquidationData.symbol,
-          side: liquidationData.side,
-          quantity: liquidationData.quantity,
-          price: liquidationData.price,
-          timestamp: liquidationData.timestamp
-        }
-      }));
-    }
-  }, [liquidationData]);
 
   return (
     <>
@@ -529,4 +428,6 @@ export const MarketParticlesV2: React.FC<MarketParticlesProps> = ({
       )}
     </>
   );
-}; 
+};
+
+export default MarketParticlesV2;

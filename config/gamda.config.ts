@@ -98,6 +98,11 @@ export interface GamdaConfig {
       background: string;
       highlight: string;
     };
+    filters: {
+      excludeStablecoins: boolean;
+      onlyMajors: boolean;
+      minVolume: number;
+    };
   };
   debug: {
     showStats: boolean;
@@ -204,6 +209,11 @@ export const defaultConfig: GamdaConfig = {
       labelSize: 1.8,
       background: '#111827',
       highlight: '#3b82f6'
+    },
+    filters: {
+      excludeStablecoins: false,
+      onlyMajors: false,
+      minVolume: 0
     }
   },
   debug: {

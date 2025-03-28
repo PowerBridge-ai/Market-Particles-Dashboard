@@ -15,12 +15,14 @@ const nextConfig = {
       net: false,
       tls: false,
       dns: false,
+      pg: false
     };
     
     return config;
   },
-  // Restrict environment where pg imports can run
-  serverComponentsExternalPackages: ['pg'],
+  experimental: {
+    esmExternals: true
+  }
 }
 
-module.exports = nextConfig 
+export default nextConfig; 

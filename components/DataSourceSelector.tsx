@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import * as React from 'react';
 import { useForm } from 'react-hook-form';
 
 interface DataSourceSelectorProps {
@@ -28,8 +28,8 @@ const DataSourceSelector: React.FC<DataSourceSelectorProps> = ({ onDataSourceCha
   });
   
   const sourceType = watch('sourceType');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   
   const onSubmit = async (data: FormData) => {
     setLoading(true);
