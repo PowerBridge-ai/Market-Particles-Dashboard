@@ -245,6 +245,7 @@ const MarketParticles = ({ marketData }: MarketParticlesProps) => {
   }, []);
 
   return <div ref={containerRef} className="fixed inset-0 z-0" />;
-};
+}; // Fix: Remove extra semicolon after closing brace
 
-export default MarketParticles; 
+import React from 'react'; // Add React import
+export default MarketParticles;
