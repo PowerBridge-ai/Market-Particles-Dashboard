@@ -5,7 +5,7 @@ import Document, { Html, Head, Main, NextScript } from 'next/document';
 import '../components/mkdirs';
 
 class MyDocument extends Document {
-  override render(): JSX.Element {
+  override render(): React.ReactElement {
     return (
       <Html lang="en">
         <Head>

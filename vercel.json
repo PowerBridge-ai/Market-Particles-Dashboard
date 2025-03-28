@@ -1,7 +1,8 @@
 {
-  "buildCommand": "uv pip install -r requirements.txt && next build",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
   "framework": "nextjs",
-  "installCommand": "curl -LsSf https://astral.sh/uv/install.sh | sh && uv pip install -r requirements.txt",
+  "installCommand": "npm install",
   "outputDirectory": ".next",
   "regions": ["sfo1"],
   "builds": [
