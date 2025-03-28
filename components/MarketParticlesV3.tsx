@@ -189,10 +189,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | null>(null);
   const lastFrameTime = useRef(performance.now());
   const frameCount = useRef(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
+  const fpsUpdateInterval = useRef<NodeJS.Timeout | null>(null);
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
 
@@ -328,7 +328,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
             if (!targetToken) return;
 
             let correlation = 0;
-            switch (config.visualization.correlationType) {
+            switch (config.visualization.correlation.type) {
               case 'price':
                 correlation = Math.abs(
                   sourceToken.price_change_24h - targetToken.price_change_24h
@@ -351,7 +351,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
                 break;
             }
 
-            if (correlation < config.visualization.correlationThreshold) {
+            if (correlation < config.visualization.correlation.threshold) {
               links.push({
                 source: sourceNode.id,
                 target: targetNode.id,
@@ -367,7 +367,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         nodeCount: nodes.length,
         linkCount: links.length,
         mode: config.visualization.mode,
-        correlationType: config.visualization.correlationType
+        correlationType: config.visualization.correlation.type
       });
 
     } catch (error) {
@@ -861,8 +861,13 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   // Add camera position sync on graph initialization
   useEffect(() => {
-    if (graphRef.current) {
-      graphRef.current.cameraPosition(config.camera.position);
+    if (graphRef.current && config.camera.position) {
+      const position = {
+        x: config.camera.position.x ?? 0,
+        y: config.camera.position.y ?? 0,
+        z: config.camera.position.z ?? 150
+      };
+      graphRef.current.cameraPosition(position);
     }
   }, [config.camera.position]);
 
