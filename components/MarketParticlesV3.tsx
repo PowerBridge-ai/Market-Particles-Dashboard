@@ -143,6 +143,32 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   autoFetch = false,
   config: propConfig
 }) => {
+  const [isClient, setIsClient] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Set isClient to true on mount
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // If we're not on the client yet, show a loading state
+  if (!isClient) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Loading visualization...</div>
+      </div>
+    );
+  }
+
+  // If there's an error, show it
+  if (error) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-black">
+        <div className="text-white text-xl">Error: {error}</div>
+      </div>
+    );
+  }
+
   // Load saved configs first to find View 1
   const loadSavedConfigs = () => {
     try {
@@ -559,72 +585,90 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
     if (!graphRef.current) {
       console.log('Creating new ForceGraph3D instance');
       try {
-        const Graph = new (ForceGraph3D as unknown as ForceGraphConstructor)();
-        if (!Graph) {
-          console.error('Failed to create ForceGraph3D instance');
+        // Check if we're in a browser environment
+        if (typeof window === 'undefined') {
+          console.error('Window is undefined - not in browser environment');
+          setError('Cannot initialize visualization in server environment');
           return;
         }
 
-        const graph = Graph(containerRef.current);
-        if (!graph) {
-          console.error('Failed to initialize graph with container');
-          return;
-        }
-
-        graphRef.current = graph;
-        console.log('Graph instance created, configuring...');
-
-        // Configure graph
-        const g = graphRef.current;
-        g.width(width)
-          .height(height)
-          .backgroundColor('#000005')
-          .nodeThreeObject((node: NodeObject) => {
-            const sprite = new SpriteText(node.id);
-            sprite.color = '#ffffff';
-            sprite.textHeight = 8;
-            sprite.backgroundColor = node.color || '#ffffff';
-            sprite.padding = 2;
-            sprite.borderRadius = 5;
-            return sprite;
-          })
-          .nodeThreeObjectExtend(true)
-          .nodeColor((node: NodeObject) => node.color || '#ffffff')
-          .nodeVal((node: NodeObject) => node.val || 5)
-          .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
-          .linkWidth((link: LinkObject) => link.value * 1)
-          .linkOpacity(0.2)
-          .linkDirectionalParticles(2)
-          .linkDirectionalParticleSpeed(0.005)
-          .showNavInfo(false)
-          .d3Force('charge', d3.forceManyBody().strength(-100))
-          .d3Force('center', d3.forceCenter(0, 0))
-          .d3Force('collision', d3.forceCollide(5));
-
-        console.log('Graph configuration complete');
-    
-        // Set initial camera position
-        g.cameraPosition({ x: 0, y: 0, z: 150 });
-
-        // Initialize with empty data
-        g.graphData({ nodes: [], links: [] });
-
-        // Handle window resize
-        const handleResize = () => {
-          if (containerRef.current && graphRef.current) {
-            const newWidth = containerRef.current.clientWidth;
-            const newHeight = containerRef.current.clientHeight;
-            graphRef.current
-              .width(newWidth)
-              .height(newHeight)
-              .cameraPosition({ x: 0, y: 0, z: 150 });
+        // Dynamically import ForceGraph3D
+        import('3d-force-graph').then((ForceGraph3D) => {
+          const Graph = ForceGraph3D.default;
+          if (!Graph) {
+            console.error('Failed to create ForceGraph3D instance');
+            setError('Failed to initialize visualization');
+            return;
           }
-        };
 
-        window.addEventListener('resize', handleResize);
-        return () => {
-          window.removeEventListener('resize', handleResize);
-        };
+          if (!containerRef.current) {
+            console.error('Container ref is null');
+            setError('Visualization container not found');
+            return;
+          }
+
+          const graph = Graph(containerRef.current);
+          if (!graph) {
+            console.error('Failed to initialize graph with container');
+            setError('Failed to create visualization');
+            return;
+          }
+
+          graphRef.current = graph;
+          console.log('Graph instance created, configuring...');
+
+          // Configure graph
+          const g = graphRef.current;
+          g.width(width)
+            .height(height)
+            .backgroundColor('#000005')
+            .nodeThreeObject((node: NodeObject) => {
+              const sprite = new SpriteText(node.id);
+              sprite.color = '#ffffff';
+              sprite.textHeight = 8;
+              sprite.backgroundColor = node.color || '#ffffff';
+              sprite.padding = 2;
+              sprite.borderRadius = 5;
+              return sprite;
+            })
+            .nodeThreeObjectExtend(true)
+            .nodeColor((node: NodeObject) => node.color || '#ffffff')
+            .nodeVal((node: NodeObject) => node.val || 5)
+            .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
+            .linkWidth((link: LinkObject) => link.value * 1)
+            .linkOpacity(0.2)
+            .linkDirectionalParticles(2)
+            .linkDirectionalParticleSpeed(0.005)
+            .showNavInfo(false)
+            .d3Force('charge', d3.forceManyBody().strength(-100))
+            .d3Force('center', d3.forceCenter(0, 0))
+            .d3Force('collision', d3.forceCollide(5));
+
+          console.log('Graph configuration complete');
+      
+          // Set initial camera position
+          g.cameraPosition({ x: 0, y: 0, z: 150 });
+
+          // Initialize with empty data
+          g.graphData({ nodes: [], links: [] });
+
+          // Handle window resize
+          const handleResize = () => {
+            if (containerRef.current && graphRef.current) {
+              const newWidth = containerRef.current.clientWidth;
+              const newHeight = containerRef.current.clientHeight;
+              graphRef.current
+                .width(newWidth)
+                .height(newHeight)
+                .cameraPosition({ x: 0, y: 0, z: 150 });
+            }
+          };
+
+          window.addEventListener('resize', handleResize);
+          return () => {
+            window.removeEventListener('resize', handleResize);
+          };
+        });
       } catch (error) {
         console.error('Error during graph initialization:', error);
         return;
