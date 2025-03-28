@@ -19,21 +19,17 @@ export interface GamdaConfig {
     fov: number;
     near: number;
     far: number;
-    position: {
+    position?: {
       x: number;
       y: number;
       z: number;
     };
-    zoom: number;
+    zoom?: number;
   };
   performance: {
     updateInterval: number;
     maxParticles: number;
     useTestData: boolean;
-    maxNodes: number;
-    maxLinks: number;
-    targetFps: number;
-    autoAdjust: boolean;
   };
   graph: {
     nodeSize: number;
@@ -66,47 +62,18 @@ export interface GamdaConfig {
       type: 'price' | 'volume' | 'volatility' | 'combined';
       threshold: number;
     };
-    nodeSize: {
-      min: number;
-      max: number;
-      byVolume: boolean;
-    };
-    nodeColor: {
-      positive: string;
-      negative: string;
-      neutral: string;
-      byChange: boolean;
-    };
-    links: {
-      visible: boolean;
-      particles: boolean;
-      width: number;
-      opacity: number;
-      particleSpeed: number;
-      particleCount: number;
-    };
-    physics: {
-      gravity: number;
-      linkStrength: number;
-      linkDistance: number;
-      repulsion: number;
-      friction: number;
-    };
-    display: {
-      showLabels: boolean;
-      labelSize: number;
-      background: string;
-      highlight: string;
-    };
+    timeframe: '1h' | '4h' | '24h' | '7d';
+    colorScheme: 'default' | 'heat' | 'gradient' | 'rainbow' | 'category';
     filters: {
+      minVolume: number;
+      minPrice: number;
       excludeStablecoins: boolean;
       onlyMajors: boolean;
-      minVolume: number;
     };
-  };
-  debug: {
-    showStats: boolean;
-    logEvents: boolean;
+    grouping: {
+      enabled: boolean;
+      method: 'market-cap' | 'sector' | 'exchange' | 'none';
+    };
   };
 }
 
@@ -141,11 +108,7 @@ export const defaultConfig: GamdaConfig = {
   performance: {
     updateInterval: 5000,
     maxParticles: 2000,
-    useTestData: false,
-    maxNodes: 100,
-    maxLinks: 500,
-    targetFps: 30,
-    autoAdjust: true
+    useTestData: false
   },
   graph: {
     nodeSize: 5,
@@ -175,49 +138,20 @@ export const defaultConfig: GamdaConfig = {
   visualization: {
     mode: 'volume',
     correlation: {
-      type: 'combined',
-      threshold: 0.5
+      type: 'price',
+      threshold: 0.3
     },
-    nodeSize: {
-      min: 1,
-      max: 8,
-      byVolume: true
-    },
-    nodeColor: {
-      positive: '#4ade80',
-      negative: '#f87171',
-      neutral: '#60a5fa',
-      byChange: true
-    },
-    links: {
-      visible: true,
-      particles: true,
-      width: 0.5,
-      opacity: 0.3,
-      particleSpeed: 0.01,
-      particleCount: 2
-    },
-    physics: {
-      gravity: -0.1,
-      linkStrength: 0.7,
-      linkDistance: 100,
-      repulsion: -80,
-      friction: 0.9
-    },
-    display: {
-      showLabels: true,
-      labelSize: 1.8,
-      background: '#111827',
-      highlight: '#3b82f6'
-    },
+    timeframe: '24h',
+    colorScheme: 'default',
     filters: {
+      minVolume: 1000000, // $1M minimum volume
+      minPrice: 0,
       excludeStablecoins: false,
-      onlyMajors: false,
-      minVolume: 0
+      onlyMajors: false
+    },
+    grouping: {
+      enabled: true,
+      method: 'market-cap'
     }
-  },
-  debug: {
-    showStats: false,
-    logEvents: false
   }
 }; 

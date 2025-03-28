@@ -1,40 +1,13 @@
 'use client';
 
-import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { GamdaDebugOverlay } from './GamdaDebugOverlay';
 import { GamdaConfig, defaultConfig } from '../config/gamda.config';
+// @ts-ignore
+import ForceGraph3D from '3d-force-graph';
+// @ts-ignore
+import SpriteText from 'three-spritetext';
 import * as d3 from 'd3';
-
-// Declare types for dynamic imports
-interface SpriteText {
-  new (text?: string): {
-    color: string;
-    textHeight: number;
-    backgroundColor: string;
-    padding: number;
-    borderRadius: number;
-  };
-}
-
-interface ForceGraphInstance {
-  width: (width: number) => ForceGraphInstance;
-  height: (height: number) => ForceGraphInstance;
-  backgroundColor: (color: string) => ForceGraphInstance;
-  nodeThreeObject: (fn: (node: any) => any) => ForceGraphInstance;
-  nodeThreeObjectExtend: (bool: boolean) => ForceGraphInstance;
-  nodeColor: (fn: (node: any) => string) => ForceGraphInstance;
-  nodeVal: (fn: (node: any) => number) => ForceGraphInstance;
-  linkColor: (fn: (link: any) => string) => ForceGraphInstance;
-  linkWidth: (fn: (link: any) => number) => ForceGraphInstance;
-  linkOpacity: (opacity: number) => ForceGraphInstance;
-  linkDirectionalParticles: (num: number) => ForceGraphInstance;
-  linkDirectionalParticleSpeed: (speed: number) => ForceGraphInstance;
-  showNavInfo: (show: boolean) => ForceGraphInstance;
-  d3Force: (forceName: string, force: any) => ForceGraphInstance;
-  cameraPosition: (pos: { x: number; y: number; z: number }) => void;
-  graphData: (data: any) => any;
-}
 
 interface SavedConfig {
   id: string;
@@ -138,19 +111,30 @@ interface LinkObject {
   color?: string;
 }
 
+interface ForceGraphInstance {
+  width: (width: number) => ForceGraphInstance;
+  height: (height: number) => ForceGraphInstance;
+  backgroundColor: (color: string) => ForceGraphInstance;
+  nodeThreeObject: (fn: (node: NodeObject) => any) => ForceGraphInstance;
+  nodeThreeObjectExtend: (bool: boolean) => ForceGraphInstance;
+  nodeColor: (fn: (node: NodeObject) => string) => ForceGraphInstance;
+  nodeVal: (fn: (node: NodeObject) => number) => ForceGraphInstance;
+  linkColor: (fn: (link: LinkObject) => string) => ForceGraphInstance;
+  linkWidth: (fn: (link: LinkObject) => number) => ForceGraphInstance;
+  linkOpacity: (opacity: number) => ForceGraphInstance;
+  linkDirectionalParticles: (num: number) => ForceGraphInstance;
+  linkDirectionalParticleSpeed: (speed: number) => ForceGraphInstance;
+  showNavInfo: (show: boolean) => ForceGraphInstance;
+  d3Force: (forceName: string, force: any) => ForceGraphInstance;
+  cameraPosition: (pos: { x: number; y: number; z: number }) => void;
+  graphData: (data?: GraphData) => { nodes: NodeObject[]; links: LinkObject[] };
+}
+
 interface ForceGraphConstructor {
   new (): {
     (container: HTMLElement): ForceGraphInstance;
   };
 }
-
-// Define group colors similar to Obsidian
-const GROUP_COLORS = [
-  '#4CAF50',  // Green
-  '#f44336',  // Red
-  '#2196F3',  // Blue
-  '#E91E63',  // Pink
-];
 
 export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   marketData: propMarketData,
@@ -158,23 +142,17 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   autoFetch = false,
   config: propConfig
 }) => {
-  // States
-  const [isClient, setIsClient] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
   // Load saved configs first to find View 1
   const loadSavedConfigs = () => {
     try {
-      if (typeof window !== 'undefined') {
-        const savedConfigsStr = localStorage.getItem('gamdaConfigs');
-        if (savedConfigsStr) {
-          const configs = JSON.parse(savedConfigsStr);
-          const view1Config = configs.find((c: SavedConfig) => c.name === 'View 1');
-          return {
-            configs,
-            defaultConfig: view1Config?.config || propConfig || defaultConfig
-          };
-        }
+      const savedConfigsStr = localStorage.getItem('gamdaConfigs');
+      if (savedConfigsStr) {
+        const configs = JSON.parse(savedConfigsStr);
+        const view1Config = configs.find((c: SavedConfig) => c.name === 'View 1');
+        return {
+          configs,
+          defaultConfig: view1Config?.config || propConfig || defaultConfig
+        };
       }
     } catch (error) {
       console.error('Error loading saved configurations:', error);
@@ -211,37 +189,40 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
-  const frameRef = useRef<number | undefined>(undefined);
-  const lastFrameTime = useRef<number>(performance.now());
-  const frameCount = useRef<number>(0);
-  const fpsUpdateInterval = useRef<NodeJS.Timeout | undefined>(undefined);
+  const frameRef = useRef<number>();
+  const lastFrameTime = useRef(performance.now());
+  const frameCount = useRef(0);
+  const fpsUpdateInterval = useRef<NodeJS.Timeout>();
 
   const marketData = autoFetch ? fetchedMarketData : propMarketData;
-  
-  // ===== HELPER FUNCTIONS =====
-  // These must be defined before they're used in the useEffect hooks!
-  
-  // Generate test data if no market data is available
-  const generateTestData = (): MarketData => {
-    console.log('Generating test data');
-    const symbols = ['BTC', 'ETH', 'SOL', 'AVAX', 'MATIC', 'DOT', 'ADA', 'LINK', 'UNI', 'AAVE', 'SNX', 'DOGE', 'XRP', 'BNB', 'ATOM'];
-    const tokens = symbols.map(symbol => ({
-      symbol,
-      price: Math.random() * 100000,
-      volume: Math.random() * 1000000000,
-      price_change_24h: (Math.random() - 0.5) * 20,
-      mark_price: Math.random() * 100000,
-      funding_rate: (Math.random() - 0.5) * 0.002
-    }));
 
-    const testData = {
-      tokens,
-      liquidations: []
+  // FPS calculation
+  useEffect(() => {
+    const updateFPS = () => {
+      const now = performance.now();
+      const elapsed = now - lastFrameTime.current;
+      const fps = frameCount.current / (elapsed / 1000);
+      setDebugInfo(prev => ({ ...prev, fps }));
+      frameCount.current = 0;
+      lastFrameTime.current = now;
     };
-    console.log('Generated test data:', testData);
-    return testData;
-  };
-  
+
+    fpsUpdateInterval.current = setInterval(updateFPS, 1000);
+    return () => {
+      if (fpsUpdateInterval.current) {
+        clearInterval(fpsUpdateInterval.current);
+      }
+    };
+  }, []);
+
+  // Define group colors similar to Obsidian
+  const GROUP_COLORS = [
+    '#4CAF50',  // Green
+    '#f44336',  // Red
+    '#2196F3',  // Blue
+    '#E91E63',  // Pink
+  ];
+
   // Create graph data from market data
   const createGraphData = (data: MarketData): GraphData => {
     console.log('Creating graph data from market data');
@@ -316,11 +297,11 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         
         // Determine node color based on visualization mode and color scheme
         let color = '#ffffff';
-        switch (config.visualization.mode) {
-          case 'volume':
+        switch (config.visualization.colorScheme) {
+          case 'heat':
             color = d3.interpolateReds(normalizedMetric);
             break;
-          case 'momentum':
+          case 'gradient':
             color = d3.interpolateViridis(normalizedMetric);
             break;
           default:
@@ -347,7 +328,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
             if (!targetToken) return;
 
             let correlation = 0;
-            switch (config.visualization.correlation.type) {
+            switch (config.visualization.correlationType) {
               case 'price':
                 correlation = Math.abs(
                   sourceToken.price_change_24h - targetToken.price_change_24h
@@ -370,7 +351,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
                 break;
             }
 
-            if (correlation < config.visualization.correlation.threshold) {
+            if (correlation < config.visualization.correlationThreshold) {
               links.push({
                 source: sourceNode.id,
                 target: targetNode.id,
@@ -386,7 +367,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         nodeCount: nodes.length,
         linkCount: links.length,
         mode: config.visualization.mode,
-        correlationType: config.visualization.correlation.type
+        correlationType: config.visualization.correlationType
       });
 
     } catch (error) {
@@ -396,109 +377,27 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
     return { nodes, links };
   };
-  
-  // Add debounced config update
-  const updateGraphWithConfig = (newConfig: GamdaConfig) => {
-    setIsUpdating(true);
-    setConfig(newConfig);
-    
-    // Update graph with new config
-    if (graphRef.current && marketData) {
-      const graphData = createGraphData(marketData);
-      
-      // Smoothly transition node properties
-      const currentData = graphRef.current.graphData({});
-      const oldNodesMap = new Map(currentData.nodes.map((n: NodeObject) => [n.id, n]));
-      
-      graphData.nodes.forEach(node => {
-        const oldNode = oldNodesMap.get(node.id);
-        if (oldNode) {
-          const nodeObject = node as NodeObject;
-          // Type assertion to avoid TypeScript errors
-          nodeObject.x = (oldNode as NodeObject).x || 0;
-          nodeObject.y = (oldNode as NodeObject).y || 0;
-          nodeObject.z = (oldNode as NodeObject).z || 0;
-        }
-      });
 
-      // Update graph with smooth transitions
-      graphRef.current
-        .nodeColor((node: NodeObject) => node.color || '#ffffff')
-        .nodeVal((node: NodeObject) => node.val || 5)
-        .linkWidth((link: LinkObject) => link.value * newConfig.display.linkThicknessScale)
-        .linkColor((link: LinkObject) => link.color || `rgba(255,255,255,${newConfig.graph.linkOpacity})`)
-        .d3Force('charge', d3.forceManyBody().strength(newConfig.forces.repelForce))
-        .d3Force('collision', d3.forceCollide().radius((node: any) => {
-          const n = node as NodeObject;
-          return (n.val || 5) * 1.2;
-        }))
-        .graphData(graphData);
+  // Generate test data if no market data is available
+  const generateTestData = (): MarketData => {
+    console.log('Generating test data');
+    const symbols = ['BTC', 'ETH', 'SOL', 'AVAX', 'MATIC', 'DOT', 'ADA', 'LINK', 'UNI', 'AAVE', 'SNX', 'DOGE', 'XRP', 'BNB', 'ATOM'];
+    const tokens = symbols.map(symbol => ({
+      symbol,
+      price: Math.random() * 100000,
+      volume: Math.random() * 1000000000,
+      price_change_24h: (Math.random() - 0.5) * 20,
+      mark_price: Math.random() * 100000,
+      funding_rate: (Math.random() - 0.5) * 0.002
+    }));
 
-      // Provide visual feedback
-      setTimeout(() => setIsUpdating(false), 1000);
-    }
-  };
-  
-  // Add camera position update handler
-  const handleCameraPositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
-    const newPosition = { ...cameraPosition, [axis]: value };
-    setCameraPosition(newPosition);
-    if (graphRef.current) {
-      graphRef.current.cameraPosition(newPosition);
-      setConfig(prev => ({
-        ...prev,
-        camera: {
-          ...prev.camera,
-          position: newPosition
-        }
-      }));
-    }
-  };
-
-  // Add zoom update handler
-  const handleZoomChange = (value: number) => {
-    setCameraZoom(value);
-    if (graphRef.current) {
-      const newPosition = {
-        ...cameraPosition,
-        z: 150 / value // Adjust base distance based on zoom
-      };
-      graphRef.current.cameraPosition(newPosition);
-      setConfig(prev => ({
-        ...prev,
-        camera: {
-          ...prev.camera,
-          position: newPosition,
-          zoom: value
-        }
-      }));
-    }
-  };
-
-  // ===== EFFECTS =====
-  // Set isClient to true on mount
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // FPS calculation
-  useEffect(() => {
-    const updateFPS = () => {
-      const now = performance.now();
-      const elapsed = now - lastFrameTime.current;
-      const fps = frameCount.current / (elapsed / 1000);
-      setDebugInfo(prev => ({ ...prev, fps }));
-      frameCount.current = 0;
-      lastFrameTime.current = now;
+    const testData = {
+      tokens,
+      liquidations: []
     };
-
-    fpsUpdateInterval.current = setInterval(updateFPS, 1000);
-    return () => {
-      if (fpsUpdateInterval.current) {
-        clearInterval(fpsUpdateInterval.current);
-      }
-    };
-  }, []);
+    console.log('Generated test data:', testData);
+    return testData;
+  };
 
   // Fetch market data if autoFetch is enabled
   useEffect(() => {
@@ -631,130 +530,136 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
       const testData = generateTestData();
       setFetchedMarketData(testData);
     }
-  }, [autoFetch, propMarketData, config.performance.useTestData]);
+  }, [autoFetch, propMarketData]);
 
   // Initialize and update graph
   useEffect(() => {
-    console.log('Graph initialization effect triggered');
+    console.log('Graph initialization effect triggered', {
+      hasContainer: !!containerRef.current,
+      hasMarketData: !!marketData,
+      tokenCount: marketData?.tokens?.length
+    });
 
-    if (!isClient) return;
-    
     if (!containerRef.current || !marketData?.tokens) {
-      console.log('Missing required data');
+      console.log('Missing required data:', {
+        containerExists: !!containerRef.current,
+        marketDataExists: !!marketData,
+        tokenCount: marketData?.tokens?.length
+      });
       return;
     }
 
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
+    console.log('Container dimensions:', { width, height });
+
     // Initialize force graph
     if (!graphRef.current) {
       console.log('Creating new ForceGraph3D instance');
-      
       try {
-        // Check if we're in a browser environment
-        if (typeof window === 'undefined') {
-          console.error('Window is undefined - not in browser environment');
-          setError('Cannot initialize visualization in server environment');
+        const Graph = new (ForceGraph3D as unknown as ForceGraphConstructor)();
+        if (!Graph) {
+          console.error('Failed to create ForceGraph3D instance');
           return;
         }
 
-        // Dynamic imports for client-side only
-        Promise.all([
-          import('3d-force-graph'),
-          import('three-spritetext')
-        ]).then(([ForceGraph3D, SpriteTextModule]) => {
-          if (!containerRef.current) return;
-          
-          try {
-            // Get constructor function and directly create the graph
-            const ForceGraph = ForceGraph3D.default;
-            const SpriteText = SpriteTextModule.default as unknown as SpriteText;
-            
-            // Create the graph instance using the ForceGraph factory
-            // @ts-ignore - ForceGraph() returns a factory function that expects an HTMLElement
-            const graph = ForceGraph()(containerRef.current);
-            graphRef.current = graph;
-            
-            // Configure graph
-            graph.width(width)
-              .height(height)
-              .backgroundColor('#000005')
-              .nodeThreeObject((node: NodeObject) => {
-                const sprite = new SpriteText(node.id);
-                sprite.color = '#ffffff';
-                sprite.textHeight = 8;
-                sprite.backgroundColor = node.color || '#ffffff';
-                sprite.padding = 2;
-                sprite.borderRadius = 5;
-                return sprite;
-              })
-              .nodeThreeObjectExtend(true)
-              .nodeColor((node: NodeObject) => node.color || '#ffffff')
-              .nodeVal((node: NodeObject) => node.val || 5)
-              .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
-              .linkWidth((link: LinkObject) => link.value * 1)
-              .linkOpacity(0.2)
-              .linkDirectionalParticles(2)
-              .linkDirectionalParticleSpeed(0.005)
-              .showNavInfo(false)
-              .d3Force('charge', d3.forceManyBody().strength(-100))
-              .d3Force('center', d3.forceCenter(0, 0))
-              .d3Force('collision', d3.forceCollide(5));
-            
-            // Set initial camera position
-            graph.cameraPosition({ x: 0, y: 0, z: 150 });
-            
-            // Initialize with empty data
-            graph.graphData({ nodes: [], links: [] });
-            
-            // Update graph with data
-            const graphData = createGraphData(marketData);
-            graph.graphData(graphData);
-            
-            // Handle window resize
-            const handleResize = () => {
-              if (containerRef.current && graphRef.current) {
-                const newWidth = containerRef.current.clientWidth;
-                const newHeight = containerRef.current.clientHeight;
-                graphRef.current
-                  .width(newWidth)
-                  .height(newHeight);
-              }
-            };
-            
-            window.addEventListener('resize', handleResize);
-          } catch (err: any) {
-            console.error('Error setting up graph:', err);
-            setError(`Failed to initialize visualization: ${err.message || 'Unknown error'}`);
+        const graph = Graph(containerRef.current);
+        if (!graph) {
+          console.error('Failed to initialize graph with container');
+          return;
+        }
+
+        graphRef.current = graph;
+        console.log('Graph instance created, configuring...');
+
+        // Configure graph
+        const g = graphRef.current;
+        g.width(width)
+          .height(height)
+          .backgroundColor('#000005')
+          .nodeThreeObject((node: NodeObject) => {
+            const sprite = new SpriteText(node.id);
+            sprite.color = '#ffffff';
+            sprite.textHeight = 8;
+            sprite.backgroundColor = node.color || '#ffffff';
+            sprite.padding = 2;
+            sprite.borderRadius = 5;
+            return sprite;
+          })
+          .nodeThreeObjectExtend(true)
+          .nodeColor((node: NodeObject) => node.color || '#ffffff')
+          .nodeVal((node: NodeObject) => node.val || 5)
+          .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
+          .linkWidth((link: LinkObject) => link.value * 1)
+          .linkOpacity(0.2)
+          .linkDirectionalParticles(2)
+          .linkDirectionalParticleSpeed(0.005)
+          .showNavInfo(false)
+          .d3Force('charge', d3.forceManyBody().strength(-100))
+          .d3Force('center', d3.forceCenter(0, 0))
+          .d3Force('collision', d3.forceCollide(5));
+
+        console.log('Graph configuration complete');
+    
+        // Set initial camera position
+        g.cameraPosition({ x: 0, y: 0, z: 150 });
+
+        // Initialize with empty data
+        g.graphData({ nodes: [], links: [] });
+
+        // Handle window resize
+        const handleResize = () => {
+          if (containerRef.current && graphRef.current) {
+            const newWidth = containerRef.current.clientWidth;
+            const newHeight = containerRef.current.clientHeight;
+            graphRef.current
+              .width(newWidth)
+              .height(newHeight)
+              .cameraPosition({ x: 0, y: 0, z: 150 });
           }
-        }).catch((err: any) => {
-          console.error('Error loading modules:', err);
-          setError(`Failed to load visualization libraries: ${err.message || 'Unknown error'}`);
-        });
-      } catch (error: any) {
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => {
+          window.removeEventListener('resize', handleResize);
+        };
+      } catch (error) {
         console.error('Error during graph initialization:', error);
-        setError(`Initialization error: ${error.message || 'Unknown error'}`);
-      }
-    } else if (marketData) {
-      // Just update graph data if graph already exists
-      try {
-        const graphData = createGraphData(marketData);
-        graphRef.current.graphData(graphData);
-      } catch (error: any) {
-        console.error('Error updating graph data:', error);
+        return;
       }
     }
-  }, [marketData, config, isClient]);
+
+    // Update graph data
+    try {
+      console.log('Creating graph data...');
+      const graphData = createGraphData(marketData);
+      console.log('Graph data created:', {
+        nodes: graphData.nodes.length,
+        links: graphData.links.length
+      });
+
+      if (graphRef.current && graphData.nodes.length > 0) {
+        console.log('Updating graph with data...');
+        graphRef.current.graphData(graphData);
+        console.log('Graph data updated');
+      } else {
+        console.warn('Cannot update graph:', {
+          hasGraph: !!graphRef.current,
+          nodeCount: graphData.nodes.length
+        });
+      }
+    } catch (error) {
+      console.error('Error updating graph data:', error);
+    }
+  }, [marketData, config]);
 
   // Handle liquidation updates
   useEffect(() => {
-    if (!isClient) return;
-    
     if (liquidationData && graphRef.current) {
       const { symbol, side } = liquidationData;
-      const currentData = graphRef.current.graphData({});
-      const node = currentData.nodes.find((n: NodeObject) => n.id === symbol);
+      const currentData = graphRef.current.graphData();
+      const node = currentData.nodes.find(n => n.id === symbol);
       if (node) {
         const originalColor = node.color;
         const originalVal = node.val;
@@ -769,12 +674,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         }, 1000);
       }
     }
-  }, [liquidationData, isClient]);
+  }, [liquidationData]);
 
   // Fetch database status
   useEffect(() => {
-    if (!isClient) return;
-    
     const fetchDbStatus = async () => {
       try {
         console.log('Fetching database status...');
@@ -808,12 +711,10 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
     const interval = setInterval(fetchDbStatus, 5000);
     fetchDbStatus();
     return () => clearInterval(interval);
-  }, [isClient]);
+  }, []);
 
   // Update frame count for FPS calculation
   useEffect(() => {
-    if (!isClient) return;
-    
     const animate = () => {
       frameCount.current++;
       frameRef.current = requestAnimationFrame(animate);
@@ -825,40 +726,55 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [isClient]);
+  }, []);
 
-  // Add camera position sync on graph initialization
-  useEffect(() => {
-    if (!isClient) return;
+  // Add debounced config update
+  const updateGraphWithConfig = (newConfig: GamdaConfig) => {
+    setIsUpdating(true);
+    setConfig(newConfig);
     
-    if (graphRef.current) {
-      graphRef.current.cameraPosition(config.camera.position);
-    }
-  }, [config.camera.position, isClient]);
+    // Update graph with new config
+    if (graphRef.current && marketData) {
+      const graphData = createGraphData(marketData);
+      
+      // Smoothly transition node properties
+      const currentData = graphRef.current.graphData();
+      const oldNodesMap = new Map(currentData.nodes.map((n: NodeObject) => [n.id, n]));
+      
+      graphData.nodes.forEach(node => {
+        const oldNode = oldNodesMap.get(node.id);
+        if (oldNode) {
+          (node as NodeObject).x = oldNode.x;
+          (node as NodeObject).y = oldNode.y;
+          (node as NodeObject).z = oldNode.z;
+        }
+      });
 
-  // Add mouse wheel zoom handler
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const handleWheel = (event: WheelEvent) => {
-      if (graphRef.current && event.deltaY !== 0) {
-        const delta = -Math.sign(event.deltaY) * 0.1;
-        const newZoom = Math.max(0.1, Math.min(5, cameraZoom + delta));
-        handleZoomChange(newZoom);
-      }
-    };
+      // Update graph with smooth transitions
+      graphRef.current
+        .nodeColor((node: NodeObject) => node.color || '#ffffff')
+        .nodeVal((node: NodeObject) => node.val || 5)
+        .linkWidth((link: LinkObject) => link.value * newConfig.display.linkThicknessScale)
+        .linkColor((link: LinkObject) => link.color || `rgba(255,255,255,${newConfig.graph.linkOpacity})`)
+        .d3Force('charge', d3.forceManyBody().strength(newConfig.forces.repelForce))
+        .d3Force('collision', d3.forceCollide().radius((node: any) => {
+          const n = node as NodeObject;
+          return (n.val || 5) * 1.2;
+        }))
+        .graphData(graphData);
 
-    const container = containerRef.current;
-    if (container) {
-      container.addEventListener('wheel', handleWheel);
-      return () => container.removeEventListener('wheel', handleWheel);
+      // Provide visual feedback
+      setTimeout(() => setIsUpdating(false), 1000);
     }
-  }, [cameraZoom, isClient]);
+  };
+
+  // Update the config change handler in GamdaDebugOverlay props
+  const handleConfigChange = (newConfig: GamdaConfig) => {
+    updateGraphWithConfig(newConfig);
+  };
 
   // Load saved configurations from localStorage on mount
   useEffect(() => {
-    if (!isClient) return;
-    
     const savedConfigsStr = localStorage.getItem('gamdaConfigs');
     if (savedConfigsStr) {
       try {
@@ -868,30 +784,7 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
         console.error('Error loading saved configurations:', error);
       }
     }
-  }, [isClient]);
-
-  // ===== EARLY RETURNS =====
-  if (!isClient) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black">
-        <div className="text-white text-xl">Loading visualization...</div>
-      </div>
-    );
-  }
-
-  // If there's an error, show it
-  if (error) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-black">
-        <div className="text-white text-xl">Error: {error}</div>
-      </div>
-    );
-  }
-
-  // Update the config change handler in GamdaDebugOverlay props
-  const handleConfigChange = (newConfig: GamdaConfig) => {
-    updateGraphWithConfig(newConfig);
-  };
+  }, []);
 
   // Save configuration
   const handleSaveConfig = () => {
@@ -929,6 +822,66 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
     setSavedConfigs(updatedConfigs);
     localStorage.setItem('gamdaConfigs', JSON.stringify(updatedConfigs));
   };
+
+  // Add camera position update handler
+  const handleCameraPositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
+    const newPosition = { ...cameraPosition, [axis]: value };
+    setCameraPosition(newPosition);
+    if (graphRef.current) {
+      graphRef.current.cameraPosition(newPosition);
+      setConfig(prev => ({
+        ...prev,
+        camera: {
+          ...prev.camera,
+          position: newPosition
+        }
+      }));
+    }
+  };
+
+  // Add zoom update handler
+  const handleZoomChange = (value: number) => {
+    setCameraZoom(value);
+    if (graphRef.current) {
+      const newPosition = {
+        ...cameraPosition,
+        z: 150 / value // Adjust base distance based on zoom
+      };
+      graphRef.current.cameraPosition(newPosition);
+      setConfig(prev => ({
+        ...prev,
+        camera: {
+          ...prev.camera,
+          position: newPosition,
+          zoom: value
+        }
+      }));
+    }
+  };
+
+  // Add camera position sync on graph initialization
+  useEffect(() => {
+    if (graphRef.current) {
+      graphRef.current.cameraPosition(config.camera.position);
+    }
+  }, [config.camera.position]);
+
+  // Add mouse wheel zoom handler
+  useEffect(() => {
+    const handleWheel = (event: WheelEvent) => {
+      if (graphRef.current && event.deltaY !== 0) {
+        const delta = -Math.sign(event.deltaY) * 0.1;
+        const newZoom = Math.max(0.1, Math.min(5, cameraZoom + delta));
+        handleZoomChange(newZoom);
+      }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('wheel', handleWheel);
+      return () => container.removeEventListener('wheel', handleWheel);
+    }
+  }, [cameraZoom]);
 
   return (
     <div className="relative w-full h-full">
