@@ -4,11 +4,37 @@ import * as React from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { GamdaDebugOverlay } from './GamdaDebugOverlay';
 import { GamdaConfig, defaultConfig } from '../config/gamda.config';
-// @ts-ignore
-import ForceGraph3D from '3d-force-graph';
-// @ts-ignore
-import SpriteText from 'three-spritetext';
 import * as d3 from 'd3';
+
+// Declare types for dynamic imports
+interface SpriteText {
+  new (text?: string): {
+    color: string;
+    textHeight: number;
+    backgroundColor: string;
+    padding: number;
+    borderRadius: number;
+  };
+}
+
+interface ForceGraphInstance {
+  width: (width: number) => ForceGraphInstance;
+  height: (height: number) => ForceGraphInstance;
+  backgroundColor: (color: string) => ForceGraphInstance;
+  nodeThreeObject: (fn: (node: any) => any) => ForceGraphInstance;
+  nodeThreeObjectExtend: (bool: boolean) => ForceGraphInstance;
+  nodeColor: (fn: (node: any) => string) => ForceGraphInstance;
+  nodeVal: (fn: (node: any) => number) => ForceGraphInstance;
+  linkColor: (fn: (link: any) => string) => ForceGraphInstance;
+  linkWidth: (fn: (link: any) => number) => ForceGraphInstance;
+  linkOpacity: (opacity: number) => ForceGraphInstance;
+  linkDirectionalParticles: (num: number) => ForceGraphInstance;
+  linkDirectionalParticleSpeed: (speed: number) => ForceGraphInstance;
+  showNavInfo: (show: boolean) => ForceGraphInstance;
+  d3Force: (forceName: string, force: any) => ForceGraphInstance;
+  cameraPosition: (pos: { x: number; y: number; z: number }) => void;
+  graphData: (data: any) => any;
+}
 
 interface SavedConfig {
   id: string;
@@ -110,25 +136,6 @@ interface LinkObject {
   target: NodeObject;
   value: number;
   color?: string;
-}
-
-interface ForceGraphInstance {
-  width: (width: number) => ForceGraphInstance;
-  height: (height: number) => ForceGraphInstance;
-  backgroundColor: (color: string) => ForceGraphInstance;
-  nodeThreeObject: (fn: (node: NodeObject) => any) => ForceGraphInstance;
-  nodeThreeObjectExtend: (bool: boolean) => ForceGraphInstance;
-  nodeColor: (fn: (node: NodeObject) => string) => ForceGraphInstance;
-  nodeVal: (fn: (node: NodeObject) => number) => ForceGraphInstance;
-  linkColor: (fn: (link: LinkObject) => string) => ForceGraphInstance;
-  linkWidth: (fn: (link: LinkObject) => number) => ForceGraphInstance;
-  linkOpacity: (opacity: number) => ForceGraphInstance;
-  linkDirectionalParticles: (num: number) => ForceGraphInstance;
-  linkDirectionalParticleSpeed: (speed: number) => ForceGraphInstance;
-  showNavInfo: (show: boolean) => ForceGraphInstance;
-  d3Force: (forceName: string, force: any) => ForceGraphInstance;
-  cameraPosition: (pos: { x: number; y: number; z: number }) => void;
-  graphData: (data?: GraphData) => { nodes: NodeObject[]; links: LinkObject[] };
 }
 
 interface ForceGraphConstructor {
@@ -561,29 +568,20 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
 
   // Initialize and update graph
   useEffect(() => {
-    console.log('Graph initialization effect triggered', {
-      hasContainer: !!containerRef.current,
-      hasMarketData: !!marketData,
-      tokenCount: marketData?.tokens?.length
-    });
+    console.log('Graph initialization effect triggered');
 
     if (!containerRef.current || !marketData?.tokens) {
-      console.log('Missing required data:', {
-        containerExists: !!containerRef.current,
-        marketDataExists: !!marketData,
-        tokenCount: marketData?.tokens?.length
-      });
+      console.log('Missing required data');
       return;
     }
 
     const width = containerRef.current.clientWidth;
     const height = containerRef.current.clientHeight;
 
-    console.log('Container dimensions:', { width, height });
-
     // Initialize force graph
     if (!graphRef.current) {
       console.log('Creating new ForceGraph3D instance');
+      
       try {
         // Check if we're in a browser environment
         if (typeof window === 'undefined') {
@@ -592,110 +590,91 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
           return;
         }
 
-        // Dynamically import ForceGraph3D
-        import('3d-force-graph').then((ForceGraph3D) => {
-          const Graph = ForceGraph3D.default;
-          if (!Graph) {
-            console.error('Failed to create ForceGraph3D instance');
-            setError('Failed to initialize visualization');
-            return;
+        // Dynamic imports for client-side only
+        Promise.all([
+          import('3d-force-graph'),
+          import('three-spritetext')
+        ]).then(([ForceGraph3D, SpriteTextModule]) => {
+          if (!containerRef.current) return;
+          
+          try {
+            // Get constructor function and directly create the graph
+            const ForceGraph = ForceGraph3D.default;
+            const SpriteText = SpriteTextModule.default as unknown as SpriteText;
+            
+            // Create the graph instance using the ForceGraph factory
+            // @ts-ignore - ForceGraph() returns a factory function that expects an HTMLElement
+            const graph = ForceGraph()(containerRef.current);
+            graphRef.current = graph;
+            
+            // Configure graph
+            graph.width(width)
+              .height(height)
+              .backgroundColor('#000005')
+              .nodeThreeObject((node: NodeObject) => {
+                const sprite = new SpriteText(node.id);
+                sprite.color = '#ffffff';
+                sprite.textHeight = 8;
+                sprite.backgroundColor = node.color || '#ffffff';
+                sprite.padding = 2;
+                sprite.borderRadius = 5;
+                return sprite;
+              })
+              .nodeThreeObjectExtend(true)
+              .nodeColor((node: NodeObject) => node.color || '#ffffff')
+              .nodeVal((node: NodeObject) => node.val || 5)
+              .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
+              .linkWidth((link: LinkObject) => link.value * 1)
+              .linkOpacity(0.2)
+              .linkDirectionalParticles(2)
+              .linkDirectionalParticleSpeed(0.005)
+              .showNavInfo(false)
+              .d3Force('charge', d3.forceManyBody().strength(-100))
+              .d3Force('center', d3.forceCenter(0, 0))
+              .d3Force('collision', d3.forceCollide(5));
+            
+            // Set initial camera position
+            graph.cameraPosition({ x: 0, y: 0, z: 150 });
+            
+            // Initialize with empty data
+            graph.graphData({ nodes: [], links: [] });
+            
+            // Update graph with data
+            const graphData = createGraphData(marketData);
+            graph.graphData(graphData);
+            
+            // Handle window resize
+            const handleResize = () => {
+              if (containerRef.current && graphRef.current) {
+                const newWidth = containerRef.current.clientWidth;
+                const newHeight = containerRef.current.clientHeight;
+                graphRef.current
+                  .width(newWidth)
+                  .height(newHeight);
+              }
+            };
+            
+            window.addEventListener('resize', handleResize);
+          } catch (err: any) {
+            console.error('Error setting up graph:', err);
+            setError(`Failed to initialize visualization: ${err.message || 'Unknown error'}`);
           }
-
-          if (!containerRef.current) {
-            console.error('Container ref is null');
-            setError('Visualization container not found');
-            return;
-          }
-
-          const graph = Graph(containerRef.current);
-          if (!graph) {
-            console.error('Failed to initialize graph with container');
-            setError('Failed to create visualization');
-            return;
-          }
-
-          graphRef.current = graph;
-          console.log('Graph instance created, configuring...');
-
-          // Configure graph
-          const g = graphRef.current;
-          g.width(width)
-            .height(height)
-            .backgroundColor('#000005')
-            .nodeThreeObject((node: NodeObject) => {
-              const sprite = new SpriteText(node.id);
-              sprite.color = '#ffffff';
-              sprite.textHeight = 8;
-              sprite.backgroundColor = node.color || '#ffffff';
-              sprite.padding = 2;
-              sprite.borderRadius = 5;
-              return sprite;
-            })
-            .nodeThreeObjectExtend(true)
-            .nodeColor((node: NodeObject) => node.color || '#ffffff')
-            .nodeVal((node: NodeObject) => node.val || 5)
-            .linkColor((link: LinkObject) => link.color || 'rgba(255,255,255,0.2)')
-            .linkWidth((link: LinkObject) => link.value * 1)
-            .linkOpacity(0.2)
-            .linkDirectionalParticles(2)
-            .linkDirectionalParticleSpeed(0.005)
-            .showNavInfo(false)
-            .d3Force('charge', d3.forceManyBody().strength(-100))
-            .d3Force('center', d3.forceCenter(0, 0))
-            .d3Force('collision', d3.forceCollide(5));
-
-          console.log('Graph configuration complete');
-      
-          // Set initial camera position
-          g.cameraPosition({ x: 0, y: 0, z: 150 });
-
-          // Initialize with empty data
-          g.graphData({ nodes: [], links: [] });
-
-          // Handle window resize
-          const handleResize = () => {
-            if (containerRef.current && graphRef.current) {
-              const newWidth = containerRef.current.clientWidth;
-              const newHeight = containerRef.current.clientHeight;
-              graphRef.current
-                .width(newWidth)
-                .height(newHeight)
-                .cameraPosition({ x: 0, y: 0, z: 150 });
-            }
-          };
-
-          window.addEventListener('resize', handleResize);
-          return () => {
-            window.removeEventListener('resize', handleResize);
-          };
+        }).catch((err: any) => {
+          console.error('Error loading modules:', err);
+          setError(`Failed to load visualization libraries: ${err.message || 'Unknown error'}`);
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error during graph initialization:', error);
-        return;
+        setError(`Initialization error: ${error.message || 'Unknown error'}`);
       }
-    }
-
-    // Update graph data
-    try {
-      console.log('Creating graph data...');
-      const graphData = createGraphData(marketData);
-      console.log('Graph data created:', {
-        nodes: graphData.nodes.length,
-        links: graphData.links.length
-      });
-
-      if (graphRef.current && graphData.nodes.length > 0) {
-        console.log('Updating graph with data...');
+    } else if (marketData) {
+      // Just update graph data if graph already exists
+      try {
+        const graphData = createGraphData(marketData);
         graphRef.current.graphData(graphData);
-        console.log('Graph data updated');
-      } else {
-        console.warn('Cannot update graph:', {
-          hasGraph: !!graphRef.current,
-          nodeCount: graphData.nodes.length
-        });
+      } catch (error: any) {
+        console.error('Error updating graph data:', error);
       }
-    } catch (error) {
-      console.error('Error updating graph data:', error);
     }
   }, [marketData, config]);
 
@@ -703,8 +682,8 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
   useEffect(() => {
     if (liquidationData && graphRef.current) {
       const { symbol, side } = liquidationData;
-      const currentData = graphRef.current.graphData();
-      const node = currentData.nodes.find(n => n.id === symbol);
+      const currentData = graphRef.current.graphData({});
+      const node = currentData.nodes.find((n: NodeObject) => n.id === symbol);
       if (node) {
         const originalColor = node.color;
         const originalVal = node.val;
@@ -783,15 +762,20 @@ export const MarketParticlesV3: React.FC<MarketParticlesProps> = ({
       const graphData = createGraphData(marketData);
       
       // Smoothly transition node properties
-      const currentData = graphRef.current.graphData();
+      const currentData = graphRef.current.graphData({});
       const oldNodesMap = new Map(currentData.nodes.map((n: NodeObject) => [n.id, n]));
       
       graphData.nodes.forEach(node => {
         const oldNode = oldNodesMap.get(node.id);
         if (oldNode) {
-          (node as NodeObject).x = oldNode.x;
-          (node as NodeObject).y = oldNode.y;
-          (node as NodeObject).z = oldNode.z;
+          const nodeObject = node as NodeObject;
+          // Type assertion to avoid TypeScript errors
+          // @ts-ignore - oldNode has x, y, z properties when coming from ForceGraph
+          nodeObject.x = oldNode.x || 0;
+          // @ts-ignore
+          nodeObject.y = oldNode.y || 0;
+          // @ts-ignore
+          nodeObject.z = oldNode.z || 0;
         }
       });
 

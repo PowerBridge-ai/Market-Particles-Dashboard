@@ -1,11 +1,10 @@
-import * as React from 'react';
 import Document, { Html, Head, Main, NextScript } from 'next/document';
 
 // Import the mkdirs script to ensure directories are created during build
 import '../components/mkdirs';
 
 class MyDocument extends Document {
-  override render(): React.ReactElement {
+  render() {
     return (
       <Html lang="en">
         <Head>
